@@ -41,7 +41,6 @@ export async function GET(request: NextRequest) {
       FROM electricity_price 
       WHERE timestamp >= "${date}T00:00:00.000Z" 
         AND timestamp < "${date}T23:59:59.999Z"
-        AND forecast = false
       GROUP ALL
     `)
     
