@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - SURREALDB_URL=http://db:8000
+      - SURREALDB_USER=root
+      - SURREALDB_PASS=root
+      - SURREALDB_NS=spottisahko
+      - SURREALDB_DB=main
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    env_file:
+      - .env.local
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+
+  db:
+    image: surrealdb/surrealdb:latest
+    ports:
+      - "8000:8000"
+    command: surreal start --log info --user root --pass root memory --bind 0.0.0.0:8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: SurrealDB with persistent storage
+  db-persistent:
+    image: surrealdb/surrealdb:latest
+    ports:
+      - "8001:8000"
+    command: surreal start --log info --user root --pass root file:/data/database.db --bind 0.0.0.0:8000
+    volumes:
+      - surrealdb_data:/data
+    restart: unless-stopped
+    profiles: ["persistent"]
+
+volumes:
+  surrealdb_data:
