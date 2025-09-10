@@ -8,7 +8,7 @@ export async function GET() {
     const db = database.getDb()
     
     // Test database query
-    const result = await db.query('SELECT time::now() as current_time')
+    const result = await db.query('RETURN time::now()')
     
     // Check if we have recent price data
     const pricesResult = await db.query<[{ count: number }[]]>(`
