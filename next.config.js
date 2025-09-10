@@ -3,6 +3,10 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  output: 'standalone',
+  experimental: {
+    outputFileTracingRoot: undefined,
+  },
 }
 
 module.exports = nextConfig
