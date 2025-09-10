@@ -71,8 +71,7 @@ export async function POST(request: NextRequest) {
           math::round(math::max(price_cents_kwh) * 100) / 100 AS max_price,
           math::round(math::mean(price_cents_kwh) * 100) / 100 AS median_price
         FROM electricity_price 
-        WHERE timestamp >= "${today}T00:00:00.000Z" 
-          AND timestamp < "${today}T23:59:59.999Z"
+        WHERE string::slice(timestamp, 0, 10) = "${today}"
         GROUP ALL
       `)
       
