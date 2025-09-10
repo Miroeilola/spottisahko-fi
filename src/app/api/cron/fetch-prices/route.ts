@@ -17,9 +17,10 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting price fetch cron job...')
     
-    // Fetch current day prices
-    const today = new Date()
-    const prices = await entsoEClient.fetchDayAheadPrices(today)
+    // Fetch yesterday's prices (more likely to have historical data)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const prices = await entsoEClient.fetchDayAheadPrices(yesterday)
     
     if (prices.length === 0) {
       console.log('No prices fetched from ENTSO-E')
