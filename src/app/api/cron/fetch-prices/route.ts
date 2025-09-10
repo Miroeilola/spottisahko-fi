@@ -17,70 +17,57 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting price fetch cron job...')
     
-    // Fetch yesterday's prices (more likely to have historical data)
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const prices = await entsoEClient.fetchDayAheadPrices(yesterday)
-    
-    if (prices.length === 0) {
-      console.log('No prices fetched from ENTSO-E')
-      return NextResponse.json({
-        success: true,
-        message: 'No new prices to update',
-        count: 0
-      })
-    }
-
-    // Save prices to database
     await database.connect()
     const db = database.getDb()
+    let totalUpdated = 0
     
-    let updatedCount = 0
-    
-    for (const price of prices) {
-      try {
-        await db.create('electricity_price', price as unknown as Record<string, unknown>)
-        updatedCount++
-      } catch (error) {
-        console.error(`Failed to save price for ${price.timestamp}:`, error)
-      }
-    }
-    
-    // Also fetch tomorrow's prices if available (usually available after 14:00)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    
-    try {
-      const tomorrowPrices = await entsoEClient.fetchDayAheadPrices(tomorrow)
+    // Try to fetch prices for the last 3 days
+    for (let daysBack = 1; daysBack <= 3; daysBack++) {
+      const targetDate = new Date()
+      targetDate.setDate(targetDate.getDate() - daysBack)
       
-      for (const price of tomorrowPrices) {
-        try {
-          await db.create('electricity_price', price as unknown as Record<string, unknown>)
-          updatedCount++
-        } catch (error) {
-          console.error(`Failed to save tomorrow's price for ${price.timestamp}:`, error)
+      console.log(`Fetching prices for ${targetDate.toISOString().split('T')[0]}`)
+      
+      try {
+        const prices = await entsoEClient.fetchDayAheadPrices(targetDate)
+        console.log(`Fetched ${prices.length} prices for ${targetDate.toISOString().split('T')[0]}`)
+        
+        if (prices.length > 0) {
+          // Store prices in database
+          for (const price of prices) {
+            try {
+              await db.create('electricity_price', {
+                timestamp: new Date(price.timestamp),
+                price_cents_kwh: price.price_cents_kwh,
+                price_area: price.price_area,
+                forecast: price.forecast
+              })
+              totalUpdated++
+            } catch (error) {
+              // Ignore duplicate key errors
+              if (!error.toString().includes('already contains')) {
+                console.error('Error storing price:', error)
+              }
+            }
+          }
         }
+      } catch (error) {
+        console.error(`Error fetching prices for ${targetDate.toISOString().split('T')[0]}:`, error)
       }
-    } catch (error) {
-      console.log('Tomorrow prices not yet available:', error instanceof Error ? error.message : String(error))
     }
     
-    console.log(`Price fetch completed. Updated ${updatedCount} records.`)
+    console.log(`Successfully updated ${totalUpdated} price records`)
     
     return NextResponse.json({
       success: true,
-      message: `Updated ${updatedCount} price records`,
-      count: updatedCount
+      message: `Updated ${totalUpdated} price records`,
+      count: totalUpdated
     })
-    
+
   } catch (error) {
     console.error('Price fetch cron job failed:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to fetch and save electricity prices',
-        details: error instanceof Error ? error.message : String(error)
-      },
+      { success: false, error: 'Internal server error', details: error.message },
       { status: 500 }
     )
   }
