@@ -21,10 +21,9 @@ export async function POST(request: NextRequest) {
     await database.connect()
     const db = database.getDb()
     
-    // Get current price
+    // Get current price (temporarily using any available data for testing)
     const currentResult = await db.query<[ElectricityPrice[]]>(`
       SELECT * FROM electricity_price 
-      WHERE timestamp <= time::now()
       ORDER BY timestamp DESC 
       LIMIT 1
     `)
@@ -47,8 +46,9 @@ export async function POST(request: NextRequest) {
     
     const recentPrices = recentResult[0] || []
     
-    // Get today's stats
-    const today = new Date().toISOString().split('T')[0]
+    // Get date from available data for testing
+    const dataDate = new Date(currentPrice.timestamp).toISOString().split('T')[0]
+    const today = dataDate
     const statsResult = await db.query<[DailyStats[]]>(`
       SELECT * FROM daily_stats 
       WHERE date = "${today}T00:00:00.000Z"
@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
         FROM electricity_price 
         WHERE timestamp >= "${today}T00:00:00.000Z" 
           AND timestamp < "${today}T23:59:59.999Z"
-          AND forecast = false
         GROUP ALL
       `)
       
