@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { database } from '@/lib/db'
 import { ElectricityPrice } from '@/types/electricity'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET() {
   try {
     await database.connect()
