@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
               totalUpdated++
             } catch (error) {
               // Ignore duplicate key errors
-              if (!error.toString().includes('already contains')) {
+              const errorMessage = error instanceof Error ? error.message : String(error)
+              if (!errorMessage.includes('already contains')) {
                 console.error('Error storing price:', error)
               }
             }
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Price fetch cron job failed:', error)
     return NextResponse.json(
-      { success: false, error: 'Internal server error', details: error.message },
+      { success: false, error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
