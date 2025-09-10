@@ -8,7 +8,14 @@ export class GeminiAI {
   constructor() {
     const apiKey = process.env.GOOGLE_AI_API_KEY
     if (!apiKey) {
-      throw new Error('Google AI API key is required')
+      // Only warn during build, don't throw error
+      if (process.env.NODE_ENV !== 'production' && typeof window === 'undefined') {
+        console.warn('Google AI API key not configured - blog generation will be unavailable')
+      }
+      // Set dummy values to allow build to complete
+      this.genAI = null as any
+      this.model = null as any
+      return
     }
     
     this.genAI = new GoogleGenerativeAI(apiKey)
@@ -20,6 +27,9 @@ export class GeminiAI {
     stats: DailyStats,
     recentPrices: ElectricityPrice[]
   ): Promise<Partial<BlogPost>> {
+    if (!this.genAI || !this.model) {
+      throw new Error('Google AI API key is required')
+    }
     const prompt = this.createBlogPrompt(currentPrice, stats, recentPrices)
     
     try {
