@@ -4,6 +4,7 @@ const nextConfig = {
     domains: [],
   },
   output: 'standalone',
+  trailingSlash: false,
   experimental: {
     outputFileTracingRoot: undefined,
   },
