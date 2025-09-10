@@ -10,7 +10,6 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@next/font": "14.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.543.0",
