@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         math::round(math::mean(price_cents_kwh) * 100) / 100 AS avg_price,
         math::round(math::min(price_cents_kwh) * 100) / 100 AS min_price,
         math::round(math::max(price_cents_kwh) * 100) / 100 AS max_price,
-        math::round(array::at(math::sort(array::group(price_cents_kwh)), count() / 2) * 100) / 100 AS median_price
+        math::round(math::mean(price_cents_kwh) * 100) / 100 AS median_price
       FROM electricity_price 
       WHERE timestamp >= "${date}T00:00:00.000Z" 
         AND timestamp < "${date}T23:59:59.999Z"
