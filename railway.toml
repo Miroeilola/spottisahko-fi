@@ -1,0 +1,44 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "spottisahko-web"
+source = "."
+
+[services.spottisahko-web]
+buildCommand = "npm run build"
+startCommand = "npm start"
+
+[services.spottisahko-web.variables]
+NODE_ENV = "production"
+PORT = "3000"
+
+[[services]]
+name = "spottisahko-db"
+image = "surrealdb/surrealdb:latest"
+
+[services.spottisahko-db]
+startCommand = "surreal start --log info --user $SURREALDB_USER --pass $SURREALDB_PASS file:./data/database.db"
+
+[services.spottisahko-db.variables]
+SURREALDB_USER = "${{SURREALDB_USER}}"
+SURREALDB_PASS = "${{SURREALDB_PASS}}"
+
+[services.spottisahko-db.volumes]
+"/data" = "surrealdb-data"
+
+[[cron]]
+name = "fetch-prices"
+schedule = "*/5 * * * *"
+command = "curl -X POST $RAILWAY_PUBLIC_DOMAIN/api/cron/fetch-prices -H 'Authorization: Bearer $CRON_SECRET'"
+
+[[cron]]
+name = "generate-blog"
+schedule = "0 10 * * *"
+command = "curl -X POST $RAILWAY_PUBLIC_DOMAIN/api/cron/generate-blog -H 'Authorization: Bearer $CRON_SECRET'"

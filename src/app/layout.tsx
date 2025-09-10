@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { GoogleAnalytics } from '@/components/analytics/google-analytics'
+import { GoogleAdSense } from '@/components/analytics/adsense'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -16,7 +18,9 @@ export const metadata: Metadata = {
     description: 'Seuraa sähkön pörssihintaa reaaliajassa. Näe päivän halvimmat tunnit ja säästä sähkölaskussa.',
     type: 'website',
     locale: 'fi_FI',
+    siteName: 'SpottiSähkö.fi',
   },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
 }
 
 export default function RootLayout({
@@ -26,7 +30,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fi">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        <GoogleAnalytics />
+        <GoogleAdSense />
+      </body>
     </html>
   )
 }
