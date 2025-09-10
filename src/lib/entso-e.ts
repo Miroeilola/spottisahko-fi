@@ -29,12 +29,17 @@ export class EntsoEClient {
   
   constructor() {
     this.apiKey = process.env.ENTSOE_API_KEY || ''
-    if (!this.apiKey) {
-      throw new Error('ENTSO-E API key is required')
+    // Only throw error at runtime, not during build time
+    if (!this.apiKey && process.env.NODE_ENV !== 'production' && typeof window === 'undefined') {
+      console.warn('ENTSO-E API key not configured - API will be unavailable')
     }
   }
 
   async fetchDayAheadPrices(date: Date): Promise<ElectricityPrice[]> {
+    if (!this.apiKey) {
+      throw new Error('ENTSO-E API key is required')
+    }
+    
     const startTime = new Date(date)
     startTime.setHours(0, 0, 0, 0)
     
