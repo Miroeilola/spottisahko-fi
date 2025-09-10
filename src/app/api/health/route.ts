@@ -23,7 +23,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       database: 'connected',
       recent_prices: recentPricesCount,
-      version: process.env.npm_package_version || '0.1.0'
+      version: process.env.npm_package_version || '0.1.1'
     })
   } catch (error) {
     console.error('Health check failed:', error)
