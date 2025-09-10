@@ -1,23 +1,10 @@
 import { MetadataRoute } from 'next'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://spottisahko.fi'
   
-  // Get blog posts for dynamic sitemap
-  let blogPosts: Array<{ slug: string; published_at: string }> = []
-  
-  try {
-    const response = await fetch(`${baseUrl}/api/blog?limit=1000`, {
-      cache: 'no-store'
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      blogPosts = data.success ? data.data : []
-    }
-  } catch (error) {
-    console.error('Failed to fetch blog posts for sitemap:', error)
-  }
+  // Skip database queries during build to avoid connection issues
+  const blogPosts: Array<{ slug: string; published_at: string }> = []
 
   const staticPages: MetadataRoute.Sitemap = [
     {

@@ -1,38 +1,38 @@
-import { Metadata } from 'next'
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BlogPost } from '@/types/electricity'
 import { format } from 'date-fns'
 import { fi } from 'date-fns/locale'
-import { Eye, ArrowRight } from 'lucide-react'
+import { Eye, ArrowRight, Loader2 } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'Blogi - SpottiSähkö.fi | Sähkön hintatiedot ja säästövinkit',
-  description: 'Lue ajankohtaisia artikkeleita sähkön pörssihinnasta, säästövinkejä ja analyysejä Suomen sähkömarkkinoista.',
-  keywords: ['sähkön hinta blogi', 'pörssisähkö vinkit', 'energiasäästö', 'sähkölaskun pienentäminen'],
-}
-
-async function getBlogPosts(): Promise<BlogPost[]> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/blog?limit=20`, {
-      cache: 'no-store', // Always get fresh data
-    })
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch blog posts')
+export default function BlogPage() {
+  const [posts, setPosts] = useState<BlogPost[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const response = await fetch('/api/blog?limit=20', {
+          cache: 'no-store',
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setPosts(data.success ? data.data : [])
+        }
+      } catch (error) {
+        console.error('Error fetching blog posts:', error)
+      } finally {
+        setLoading(false)
+      }
     }
     
-    const data = await response.json()
-    return data.success ? data.data : []
-  } catch (error) {
-    console.error('Error fetching blog posts:', error)
-    return []
-  }
-}
-
-export default async function BlogPage() {
-  const posts = await getBlogPosts()
+    fetchPosts()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -48,7 +48,14 @@ export default async function BlogPage() {
             </p>
           </div>
 
-          {posts.length === 0 ? (
+          {loading ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <p className="text-gray-600">Ladataan blogisivuja...</p>
+              </CardContent>
+            </Card>
+          ) : posts.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
                 <p className="text-gray-600 mb-4">
