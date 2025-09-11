@@ -13,8 +13,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Track page view
     await db.query(`
@@ -48,8 +47,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Get basic analytics data
     const todayResult = await db.query<[{ count: number }[]]>(`

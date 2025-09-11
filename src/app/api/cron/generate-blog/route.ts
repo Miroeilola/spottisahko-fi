@@ -18,8 +18,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting blog generation cron job...')
     
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Get current price (temporarily using any available data for testing)
     const currentResult = await db.query<[ElectricityPrice[]]>(`

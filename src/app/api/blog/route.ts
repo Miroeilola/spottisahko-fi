@@ -4,8 +4,7 @@ import { BlogPost } from '@/types/electricity'
 
 export async function GET(request: NextRequest) {
   try {
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     const searchParams = request.nextUrl.searchParams
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50)
@@ -88,8 +87,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Check if slug already exists
     const existingResult = await db.query<[BlogPost[]]>(`

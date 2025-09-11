@@ -4,8 +4,7 @@ import { ElectricityPrice } from '@/types/electricity'
 
 export async function GET(request: NextRequest) {
   try {
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     const searchParams = request.nextUrl.searchParams
     const hours = parseInt(searchParams.get('hours') || '24')
@@ -68,8 +67,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Insert prices (using UPSERT to handle duplicates)
     for (const price of prices) {

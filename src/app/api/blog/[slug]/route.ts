@@ -9,8 +9,7 @@ export async function GET(
   try {
     const { slug } = params
     
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Get blog post by slug
     const result = await db.query<[BlogPost[]]>(`

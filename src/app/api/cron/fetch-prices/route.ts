@@ -17,8 +17,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting price fetch cron job...')
     
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     let totalUpdated = 0
     
     // Try to fetch prices for the last 3 days

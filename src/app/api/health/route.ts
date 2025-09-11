@@ -4,8 +4,7 @@ import { database } from '@/lib/db'
 export async function GET() {
   try {
     // Check database connection
-    await database.connect()
-    const db = database.getDb()
+    const db = await database.getDb()
     
     // Test database query
     const result = await db.query('RETURN time::now()')

@@ -3,6 +3,10 @@ import { Surreal } from 'surrealdb'
 class Database {
   private static instance: Database
   private db: Surreal
+  private isConnected: boolean = false
+  private connectionPromise: Promise<void> | null = null
+  private lastHealthCheck: number = 0
+  private readonly HEALTH_CHECK_INTERVAL = 30000 // 30 seconds
 
   private constructor() {
     this.db = new Surreal()
@@ -15,10 +19,43 @@ class Database {
     return Database.instance
   }
 
-  public async connect() {
+  public async connect(): Promise<void> {
+    // If already connected and healthy, return
+    if (this.isConnected && this.isConnectionHealthy()) {
+      return
+    }
+
+    // If connection is in progress, wait for it
+    if (this.connectionPromise) {
+      return this.connectionPromise
+    }
+
+    // Start new connection
+    this.connectionPromise = this.establishConnection()
+    
     try {
+      await this.connectionPromise
+    } finally {
+      this.connectionPromise = null
+    }
+  }
+
+  private async establishConnection(): Promise<void> {
+    try {
+      // Close existing connection if any
+      if (this.isConnected) {
+        try {
+          await this.db.close()
+        } catch (error) {
+          // Ignore close errors
+        }
+        this.isConnected = false
+      }
+
+      // Create new connection
       await this.db.connect(process.env.SURREALDB_URL || 'http://localhost:8000')
       
+      // For development with memory database, use root authentication
       await this.db.signin({
         username: process.env.SURREALDB_USER || 'root',
         password: process.env.SURREALDB_PASS || 'root',
@@ -29,11 +66,49 @@ class Database {
         database: process.env.SURREALDB_DB || 'main',
       })
 
+      this.isConnected = true
+      this.lastHealthCheck = Date.now()
       console.log('Connected to SurrealDB')
-      await this.initializeSchema()
+      
+      // Only initialize schema once per app lifecycle
+      if (!process.env.SCHEMA_INITIALIZED) {
+        await this.initializeSchema()
+        process.env.SCHEMA_INITIALIZED = 'true'
+      }
     } catch (error) {
       console.error('Failed to connect to SurrealDB:', error)
+      this.isConnected = false
       throw error
+    }
+  }
+
+  private isConnectionHealthy(): boolean {
+    return Date.now() - this.lastHealthCheck < this.HEALTH_CHECK_INTERVAL
+  }
+
+  private async checkHealth(): Promise<boolean> {
+    if (!this.isConnected) {
+      return false
+    }
+
+    try {
+      await this.db.query('SELECT 1')
+      this.lastHealthCheck = Date.now()
+      return true
+    } catch (error) {
+      console.log('Database health check failed:', error)
+      this.isConnected = false
+      return false
+    }
+  }
+
+  public async ensureConnection() {
+    // Check connection health periodically
+    if (!this.isConnected || !this.isConnectionHealthy()) {
+      const isHealthy = await this.checkHealth()
+      if (!isHealthy) {
+        await this.connect()
+      }
     }
   }
 
@@ -127,11 +202,38 @@ class Database {
     }
   }
 
-  public getDb(): Surreal {
+  public async getDb(): Promise<Surreal> {
+    await this.ensureConnection()
+    return this.db
+  }
+
+  public async query<T = any>(sql: string, params?: Record<string, any>, retries = 1): Promise<T> {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const db = await this.getDb()
+        return await db.query<T>(sql, params)
+      } catch (error: any) {
+        // If it's a token expiration or connection error, try to reconnect
+        if ((error?.message?.includes('token has expired') || 
+             error?.message?.includes('permissions') ||
+             error?.status === 401) && i < retries) {
+          console.log('Database connection error, attempting reconnection...')
+          this.isConnected = false
+          await this.connect()
+          continue
+        }
+        throw error
+      }
+    }
+    throw new Error('Max retries exceeded')
+  }
+
+  public getDbSync(): Surreal {
     return this.db
   }
 
   public async disconnect() {
+    this.isConnected = false
     await this.db.close()
   }
 }
