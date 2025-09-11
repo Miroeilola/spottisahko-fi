@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const vatRate = 1.255 // Finnish VAT 25.5%
     
     // Base stats (without VAT)
-    let stats = {
+    let stats: DailyStats = {
       date: `${date}T00:00:00.000Z`,
       avg_price: 6.85,
       min_price: 2.15,

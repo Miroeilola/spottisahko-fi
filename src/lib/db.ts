@@ -207,26 +207,6 @@ class Database {
     return this.db
   }
 
-  public async query<T = any>(sql: string, params?: Record<string, any>, retries = 1): Promise<T> {
-    for (let i = 0; i <= retries; i++) {
-      try {
-        const db = await this.getDb()
-        return await db.query<T>(sql, params)
-      } catch (error: any) {
-        // If it's a token expiration or connection error, try to reconnect
-        if ((error?.message?.includes('token has expired') || 
-             error?.message?.includes('permissions') ||
-             error?.status === 401) && i < retries) {
-          console.log('Database connection error, attempting reconnection...')
-          this.isConnected = false
-          await this.connect()
-          continue
-        }
-        throw error
-      }
-    }
-    throw new Error('Max retries exceeded')
-  }
 
   public getDbSync(): Surreal {
     return this.db

@@ -3,6 +3,7 @@ export interface ElectricityPrice {
   price_cents_kwh: number
   price_area: string
   forecast: boolean
+  vat_included?: boolean
 }
 
 export interface DailyStats {
@@ -11,6 +12,7 @@ export interface DailyStats {
   min_price: number
   max_price: number
   median_price: number
+  vat_included?: boolean
 }
 
 export interface BlogPost {

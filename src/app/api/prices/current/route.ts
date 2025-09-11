@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { database } from '@/lib/db'
 import { ElectricityPrice } from '@/types/electricity'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Check if user wants VAT included
@@ -19,10 +21,10 @@ export async function GET(request: Request) {
       
       // Filter to only past and current hour prices (not future forecasts for "current")
       const currentTime = now.toISOString()
-      const actualPrices = prices.filter(p => p.timestamp <= currentTime && !p.forecast)
+      const actualPrices = prices.filter((p: any) => p.timestamp <= currentTime && !p.forecast)
       
       // If no actual prices, fall back to most recent data
-      let currentPrice = actualPrices[0] || prices.find(p => p.timestamp.includes("T18:")) || prices[0]
+      let currentPrice = actualPrices[0] || prices.find((p: any) => p.timestamp.includes("T18:")) || prices[0]
       let previousPrice = actualPrices[1] || prices[1]
       
       // Apply VAT if requested
