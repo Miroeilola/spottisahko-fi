@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const today = dataDate
     const statsResult = await db.query<[DailyStats[]]>(`
       SELECT * FROM daily_stats 
-      WHERE date = "${today}T00:00:00.000Z"
+      WHERE date = d"${today}T00:00:00.000Z"
       LIMIT 1
     `)
     
@@ -58,25 +58,24 @@ export async function POST(request: NextRequest) {
     
     // If no stats exist, calculate them
     if (!stats) {
-      const calculatedResult = await db.query<[{
-        avg_price: number
-        min_price: number
-        max_price: number
-        median_price: number
-      }[]]>(`
-        SELECT 
-          math::round(math::mean(price_cents_kwh) * 100) / 100 AS avg_price,
-          math::round(math::min(price_cents_kwh) * 100) / 100 AS min_price,
-          math::round(math::max(price_cents_kwh) * 100) / 100 AS max_price,
-          math::round(math::mean(price_cents_kwh) * 100) / 100 AS median_price
-        FROM electricity_price 
+      const pricesForDay = await db.query<[{ price_cents_kwh: number }[]]>(`
+        SELECT price_cents_kwh FROM electricity_price 
         WHERE string::slice(timestamp, 0, 10) = "${today}"
-        GROUP ALL
       `)
       
-      const calculatedStats = calculatedResult[0]?.[0]
+      const prices = pricesForDay[0]?.map(p => p.price_cents_kwh) || []
       
-      if (calculatedStats) {
+      if (prices.length > 0) {
+        const sortedPrices = [...prices].sort((a, b) => a - b)
+        const calculatedStats = {
+          avg_price: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
+          min_price: Math.round(Math.min(...prices) * 100) / 100,
+          max_price: Math.round(Math.max(...prices) * 100) / 100,
+          median_price: Math.round((sortedPrices.length % 2 === 0 
+            ? (sortedPrices[sortedPrices.length / 2 - 1] + sortedPrices[sortedPrices.length / 2]) / 2
+            : sortedPrices[Math.floor(sortedPrices.length / 2)]) * 100) / 100
+        }
+        
         stats = {
           date: `${today}T00:00:00.000Z`,
           ...calculatedStats
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
         // Save calculated stats
         await db.query(`
           CREATE daily_stats SET
-            date = "${today}T00:00:00.000Z",
+            date = d"${today}T00:00:00.000Z",
             avg_price = ${calculatedStats.avg_price},
             min_price = ${calculatedStats.min_price},
             max_price = ${calculatedStats.max_price},
@@ -104,8 +103,8 @@ export async function POST(request: NextRequest) {
     // Check if we already generated a blog post today
     const existingPostResult = await db.query<[{ count: number }[]]>(`
       SELECT count() as count FROM blog_posts 
-      WHERE published_at >= "${today}T00:00:00.000Z"
-        AND published_at < "${today}T23:59:59.999Z"
+      WHERE published_at >= d"${today}T00:00:00.000Z"
+        AND published_at < d"${today}T23:59:59.999Z"
     `)
     
     const existingPosts = existingPostResult[0]?.[0]?.count || 0

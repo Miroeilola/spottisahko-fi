@@ -52,10 +52,20 @@ export class GeminiAI {
     const trend = this.analyzeTrend(recentPrices)
     const priceLevel = this.categorizePriceLevel(currentPrice.price_cents_kwh)
     
+    const currentDate = new Date().toLocaleDateString('fi-FI')
+    const reasons = {
+      "Erittäin halpa": "runsaan tuulivoimatuotannon ja vähäisen kysynnän ansiosta",
+      "Halpa": "hyvän energiatuotannon ja maltillisen kysynnän vuoksi", 
+      "Normaali": "tasapainoisen tarjonta-kysyntäsuhteen myötä",
+      "Kallis": "vähentyneen tuulivoimatuotannon ja korkean kysynnän takia",
+      "Erittäin kallis": "energian kysynnän huipun ja rajoittuneen tuotannon vuoksi"
+    }
+
     return `
 Kirjoita SEO-optimoitu suomenkielinen blogipostaus sähkön pörssihinnasta. Käytä seuraavia tietoja:
 
 NYKYINEN HINTA: ${currentPrice.price_cents_kwh.toFixed(2)} c/kWh (${priceLevel})
+PÄIVÄMÄÄRÄ: ${currentDate}
 PÄIVÄN TILASTOT:
 - Keskihinta: ${stats.avg_price.toFixed(2)} c/kWh
 - Minimi: ${stats.min_price.toFixed(2)} c/kWh  
@@ -63,22 +73,27 @@ PÄIVÄN TILASTOT:
 - Mediaani: ${stats.median_price.toFixed(2)} c/kWh
 
 HINTATRENDI: ${trend}
+HINTASELVITYS: Nykyinen hinta johtuu ${reasons[priceLevel] || "markkinaolosuhteiden muutoksista"}
 
 Kirjoita vastaus JSON-muodossa seuraavilla kentillä:
 {
   "title": "Houkutteleva otsikko (max 60 merkkiä)",
-  "slug": "url-ystävällinen-slug",
+  "slug": "url-ystävällinen-slug", 
   "meta_description": "SEO-kuvaus (max 160 merkkiä)",
   "keywords": ["avainsana1", "avainsana2", "avainsana3"],
   "content": "Markdown-muotoinen sisältö (500-800 sanaa)"
 }
 
-VAATIMUKSET:
-- Sisällytä ajankohtainen hinta-analyysi ja käytännön vinkkejä
+KRIITTISET VAATIMUKSET:
+- ÄLÄ käytä hakasulkuja [] tai placeholdereita - kaikki tieto on annettava valmiina
+- ÄLÄ jätä tyhjiä kohtia tai "[tänne jotain]" -merkintöjä
+- Käytä VAIN annettuja todellisia lukuja ja päivämäärää
+- Sisällytä päivämäärä ${currentDate} ja todelliset hintatiedot
+- Selitä hintataso käyttäen annettua syytä: ${reasons[priceLevel] || "markkinaolosuhteiden muutoksista"}
+- Kirjoita valmis, julkaisukelpoinen teksti ilman puuttuvia tietoja
 - Käytä avainsanoja: "sähkön hinta", "pörssisähkö", "sähkölasku", "energiasäästö"
+- Anna konkreettisia säästövinkkejä hintatason ${priceLevel} mukaan
 - Kirjoita selkeää ja hyödyllistä sisältöä suomalaisille kuluttajille
-- Sisällytä konkreettisia säästövinkkejä hintatason mukaan
-- Mainitse ajankohta ja päivän hintatiedot
 `
   }
 

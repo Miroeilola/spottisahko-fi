@@ -5,14 +5,14 @@ import { DailyStats } from '@/types/electricity'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const days = parseInt(searchParams.get('days') || '365')
+  const limit = Math.min(days, 1825) // Max 5 years
+  const includeVat = searchParams.get('vat') === 'true'
+  const vatRate = 1.255 // Finnish VAT 25.5%
+
   try {
     const db = await database.getDb()
-    
-    const searchParams = request.nextUrl.searchParams
-    const days = parseInt(searchParams.get('days') || '365')
-    const limit = Math.min(days, 1825) // Max 5 years
-    const includeVat = searchParams.get('vat') === 'true'
-    const vatRate = 1.255 // Finnish VAT 25.5%
     
     // Get daily aggregated price data
     const result = await db.query<[DailyStats[]]>(`
@@ -58,8 +58,6 @@ export async function GET(request: NextRequest) {
     console.error('Failed to fetch daily prices:', error)
     
     // Return mock data for development
-    const searchParams = request.nextUrl.searchParams
-    const days = parseInt(searchParams.get('days') || '365')
     const mockDailyData = Array.from({ length: Math.min(days, 365) }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - i)
