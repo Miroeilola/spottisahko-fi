@@ -28,7 +28,7 @@ export default function Home() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [includeVat, setIncludeVat] = useState(false)
+  const [includeVat, setIncludeVat] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -111,7 +111,7 @@ export default function Home() {
                 className="transition-colors"
               >
                 <Calculator className="h-4 w-4 mr-2" />
-                {includeVat ? 'Sis. ALV 25.5%' : 'Ei ALV:ia'}
+                {includeVat ? 'Kuluttajahinta' : 'Pörssihinta'}
               </Button>
               <Link href="/blogi">
                 <Button variant="ghost" size="sm">

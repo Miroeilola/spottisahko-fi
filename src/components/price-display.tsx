@@ -72,7 +72,7 @@ export function PriceDisplay({ currentPrice, previousPrice, className, includeVa
         </CardTitle>
         <CardDescription>
           {currentPrice.forecast ? 'Ennuste' : 'Toteutunut hinta'} 
-          {includeVat && ' (sis. ALV 25.5%)'}
+          {includeVat ? ' (sis. ALV 25.5%)' : ' (ilman ALV:ia)'}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center">
@@ -118,7 +118,7 @@ export function StatsCards({ stats, className, includeVat }: StatsCardsProps) {
                 --.-
               </div>
               <p className="text-xs text-muted-foreground">
-                c/kWh{includeVat && ' (sis. ALV)'}
+                c/kWh{includeVat ? ' (sis. ALV)' : ' (ilman ALV)'}
               </p>
             </CardContent>
           </Card>
@@ -146,7 +146,7 @@ export function StatsCards({ stats, className, includeVat }: StatsCardsProps) {
               {card.value.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              c/kWh{includeVat && ' (sis. ALV)'}
+              c/kWh{includeVat ? ' (sis. ALV)' : ' (ilman ALV)'}
             </p>
           </CardContent>
         </Card>
