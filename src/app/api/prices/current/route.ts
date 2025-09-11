@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       const actualPrices = prices.filter((p: any) => p.timestamp <= currentTime && !p.forecast)
       
       // If no actual prices, fall back to most recent data
-      let currentPrice = actualPrices[0] || prices.find((p: any) => p.timestamp.includes("T18:")) || prices[0]
+      let currentPrice = actualPrices[0] || prices[0]
       let previousPrice = actualPrices[1] || prices[1]
       
       // Apply VAT if requested

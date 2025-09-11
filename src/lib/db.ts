@@ -92,7 +92,7 @@ class Database {
     }
 
     try {
-      await this.db.query('SELECT 1')
+      await this.db.query('RETURN time::now()')
       this.lastHealthCheck = Date.now()
       return true
     } catch (error) {
