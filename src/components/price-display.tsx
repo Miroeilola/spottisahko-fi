@@ -10,9 +10,10 @@ interface PriceDisplayProps {
   currentPrice?: ElectricityPrice
   previousPrice?: ElectricityPrice
   className?: string
+  includeVat?: boolean
 }
 
-export function PriceDisplay({ currentPrice, previousPrice, className }: PriceDisplayProps) {
+export function PriceDisplay({ currentPrice, previousPrice, className, includeVat }: PriceDisplayProps) {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
   useEffect(() => {
@@ -70,7 +71,8 @@ export function PriceDisplay({ currentPrice, previousPrice, className }: PriceDi
           Sähkön pörssihinta
         </CardTitle>
         <CardDescription>
-          {currentPrice.forecast ? 'Ennuste' : 'Toteutunut hinta'}
+          {currentPrice.forecast ? 'Ennuste' : 'Toteutunut hinta'} 
+          {includeVat && ' (sis. ALV 25.5%)'}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center">
@@ -99,9 +101,10 @@ interface StatsCardsProps {
     median_price: number
   }
   className?: string
+  includeVat?: boolean
 }
 
-export function StatsCards({ stats, className }: StatsCardsProps) {
+export function StatsCards({ stats, className, includeVat }: StatsCardsProps) {
   if (!stats) {
     return (
       <div className={cn("grid grid-cols-2 md:grid-cols-4 gap-4", className)}>
@@ -114,7 +117,9 @@ export function StatsCards({ stats, className }: StatsCardsProps) {
               <div className="text-2xl font-bold text-muted-foreground">
                 --.-
               </div>
-              <p className="text-xs text-muted-foreground">c/kWh</p>
+              <p className="text-xs text-muted-foreground">
+                c/kWh{includeVat && ' (sis. ALV)'}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -140,7 +145,9 @@ export function StatsCards({ stats, className }: StatsCardsProps) {
             <div className={cn("text-2xl font-bold", card.color)}>
               {card.value.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground">c/kWh</p>
+            <p className="text-xs text-muted-foreground">
+              c/kWh{includeVat && ' (sis. ALV)'}
+            </p>
           </CardContent>
         </Card>
       ))}

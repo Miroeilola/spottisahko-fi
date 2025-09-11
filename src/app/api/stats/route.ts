@@ -8,17 +8,35 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const date = searchParams.get('date') || '2025-09-10'
+    const includeVat = searchParams.get('vat') === 'true'
+    const vatRate = 1.255 // Finnish VAT 25.5%
     
-    // Return working stats data for now
+    // Base stats (without VAT)
+    let stats = {
+      date: `${date}T00:00:00.000Z`,
+      avg_price: 6.85,
+      min_price: 2.15,
+      max_price: 12.45,
+      median_price: 6.72
+    }
+    
+    // Apply VAT if requested
+    if (includeVat) {
+      stats = {
+        ...stats,
+        avg_price: Math.round(stats.avg_price * vatRate * 100) / 100,
+        min_price: Math.round(stats.min_price * vatRate * 100) / 100,
+        max_price: Math.round(stats.max_price * vatRate * 100) / 100,
+        median_price: Math.round(stats.median_price * vatRate * 100) / 100,
+        vat_included: true
+      }
+    }
+    
     return NextResponse.json({
       success: true,
-      data: {
-        date: `${date}T00:00:00.000Z`,
-        avg_price: 6.85,
-        min_price: 2.15,
-        max_price: 12.45,
-        median_price: 6.72
-      }
+      data: stats,
+      vat_included: includeVat,
+      vat_rate: includeVat ? "25.5%" : null
     })
     
   } catch (error) {

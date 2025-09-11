@@ -11,7 +11,7 @@ import { ElectricityPrice, DailyStats, BlogPost } from '@/types/electricity'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { format } from 'date-fns'
 import { fi } from 'date-fns/locale'
-import { ArrowRight, TrendingUp, BarChart3, BookOpen, Zap } from 'lucide-react'
+import { ArrowRight, TrendingUp, BarChart3, BookOpen, Zap, Calculator } from 'lucide-react'
 
 interface HomePageData {
   currentPrice?: ElectricityPrice
@@ -28,22 +28,27 @@ export default function Home() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [includeVat, setIncludeVat] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true)
         
+        // VAT parameter for API calls
+        const vatParam = includeVat ? '?vat=true' : ''
+        const vatParamWithAnd = includeVat ? '&vat=true' : ''
+        
         // Fetch current price
-        const currentResponse = await fetch('/api/prices/current')
+        const currentResponse = await fetch(`/api/prices/current${vatParam}`)
         const currentData = await currentResponse.json()
         
         // Fetch price history (last 24 hours)
-        const historyResponse = await fetch('/api/prices?hours=24')
+        const historyResponse = await fetch(`/api/prices?hours=24${vatParamWithAnd}`)
         const historyData = await historyResponse.json()
         
         // Fetch today's stats
-        const statsResponse = await fetch('/api/stats')
+        const statsResponse = await fetch(`/api/stats${vatParam}`)
         const statsData = await statsResponse.json()
         
         // Fetch recent blog posts
@@ -75,7 +80,7 @@ export default function Home() {
     const interval = setInterval(fetchData, 5 * 60 * 1000)
     
     return () => clearInterval(interval)
-  }, [])
+  }, [includeVat])
 
   const handleBlogClick = (slug: string) => {
     trackEvent('click', 'blog_post', slug)
@@ -96,6 +101,18 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-gray-900">SpottiSähkö.fi</h1>
             </div>
             <div className="flex gap-4">
+              <Button 
+                variant={includeVat ? "default" : "ghost"} 
+                size="sm"
+                onClick={() => {
+                  setIncludeVat(!includeVat)
+                  trackEvent('click', 'vat_toggle', includeVat ? 'exclude' : 'include')
+                }}
+                className="transition-colors"
+              >
+                <Calculator className="h-4 w-4 mr-2" />
+                {includeVat ? 'Sis. ALV 25.5%' : 'Ei ALV:ia'}
+              </Button>
               <Link href="/blogi">
                 <Button variant="ghost" size="sm">
                   <BookOpen className="h-4 w-4 mr-2" />
@@ -144,6 +161,7 @@ export default function Home() {
               <PriceDisplay 
                 currentPrice={data.currentPrice}
                 previousPrice={data.previousPrice}
+                includeVat={includeVat}
               />
             </section>
 
@@ -153,7 +171,7 @@ export default function Home() {
                 <BarChart3 className="h-6 w-6" />
                 Päivän tilastot
               </h3>
-              <StatsCards stats={data.stats} />
+              <StatsCards stats={data.stats} includeVat={includeVat} />
             </section>
 
             {/* Price Chart */}

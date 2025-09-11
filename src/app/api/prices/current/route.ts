@@ -2,27 +2,58 @@ import { NextResponse } from 'next/server'
 import { database } from '@/lib/db'
 import { ElectricityPrice } from '@/types/electricity'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // For now, return the most recent actual price data
-    // The query issue will be investigated separately
-    return NextResponse.json({
-      success: true,
-      data: {
-        current: {
-          timestamp: "2025-09-10T21:00:00.000Z",
-          price_cents_kwh: 0.5,
-          price_area: "FI",
-          forecast: false
-        },
-        previous: {
-          timestamp: "2025-09-10T20:00:00.000Z", 
-          price_cents_kwh: 0.48,
-          price_area: "FI",
-          forecast: false
+    // Check if user wants VAT included
+    const url = new URL(request.url)
+    const includeVat = url.searchParams.get('vat') === 'true'
+    const vatRate = 1.255 // Finnish VAT 25.5%
+    
+    // Get recent prices
+    const response = await fetch('http://localhost:3001/api/prices?hours=24')
+    const data = await response.json()
+    
+    if (data.success && data.data && data.data.length > 0) {
+      const prices = data.data
+      const now = new Date()
+      
+      // Filter to only past and current hour prices (not future forecasts for "current")
+      const currentTime = now.toISOString()
+      const actualPrices = prices.filter(p => p.timestamp <= currentTime && !p.forecast)
+      
+      // If no actual prices, fall back to most recent data
+      let currentPrice = actualPrices[0] || prices.find(p => p.timestamp.includes("T18:")) || prices[0]
+      let previousPrice = actualPrices[1] || prices[1]
+      
+      // Apply VAT if requested
+      if (includeVat && currentPrice) {
+        currentPrice = {
+          ...currentPrice,
+          price_cents_kwh: Math.round(currentPrice.price_cents_kwh * vatRate * 100) / 100,
+          vat_included: true
         }
       }
-    })
+      
+      if (includeVat && previousPrice) {
+        previousPrice = {
+          ...previousPrice,
+          price_cents_kwh: Math.round(previousPrice.price_cents_kwh * vatRate * 100) / 100,
+          vat_included: true
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          current: currentPrice,
+          previous: previousPrice
+        },
+        vat_included: includeVat,
+        vat_rate: includeVat ? "25.5%" : null
+      })
+    }
+    
+    throw new Error('No price data available')
   } catch (error) {
     console.error('Failed to fetch current price:', error)
     

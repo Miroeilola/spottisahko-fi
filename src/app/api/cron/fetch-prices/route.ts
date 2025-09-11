@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     const db = await database.getDb()
     let totalUpdated = 0
     
-    // Try to fetch prices for the last 3 days
-    for (let daysBack = 1; daysBack <= 3; daysBack++) {
+    // Try to fetch prices for today and the last 3 days
+    for (let daysBack = 0; daysBack <= 3; daysBack++) {
       const targetDate = new Date()
       targetDate.setDate(targetDate.getDate() - daysBack)
       

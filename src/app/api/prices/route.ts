@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const hours = parseInt(searchParams.get('hours') || '24')
     const limit = Math.min(hours, 168) // Max 7 days
+    const includeVat = searchParams.get('vat') === 'true'
+    const vatRate = 1.255 // Finnish VAT 25.5%
     
     // Check record count for debugging
     const countResult = await db.query<[{count: number}[]]>(`
@@ -24,12 +26,23 @@ export async function GET(request: NextRequest) {
       LIMIT ${limit}
     `)
     
-    const prices = result[0] || []
+    let prices = result[0] || []
+    
+    // Apply VAT if requested
+    if (includeVat) {
+      prices = prices.map(price => ({
+        ...price,
+        price_cents_kwh: Math.round(price.price_cents_kwh * vatRate * 100) / 100,
+        vat_included: true
+      }))
+    }
     
     return NextResponse.json({
       success: true,
       data: prices,
-      count: prices.length
+      count: prices.length,
+      vat_included: includeVat,
+      vat_rate: includeVat ? "25.5%" : null
     })
   } catch (error) {
     console.error('Failed to fetch prices:', error)
