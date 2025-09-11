@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     console.error('Failed to fetch daily prices:', error)
     
     // Return mock data for development
+    const searchParams = request.nextUrl.searchParams
+    const days = parseInt(searchParams.get('days') || '365')
     const mockDailyData = Array.from({ length: Math.min(days, 365) }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - i)

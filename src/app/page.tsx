@@ -179,10 +179,7 @@ export default function Home() {
               <PriceChart 
                 data={data.priceHistory} 
                 includeVat={includeVat}
-                currentPrice={data.currentPrice?.price_cents_kwh ? 
-                  (includeVat ? data.currentPrice.price_cents_kwh * 1.255 : data.currentPrice.price_cents_kwh) 
-                  : undefined
-                }
+                currentPrice={data.currentPrice?.price_cents_kwh}
               />
             </section>
 

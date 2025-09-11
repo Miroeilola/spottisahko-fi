@@ -49,22 +49,28 @@ export async function POST(request: NextRequest) {
         console.log(`Fetched ${prices.length} prices for ${targetDate.toISOString().split('T')[0]} (${prices.filter(p => p.forecast).length} forecasts)`)
         
         if (prices.length > 0) {
-          // Store prices in database
+          // Store prices in database using UPSERT to handle duplicates better
           for (const price of prices) {
             try {
-              await db.create('electricity_price', {
-                timestamp: new Date(price.timestamp),
-                price_cents_kwh: price.price_cents_kwh,
-                price_area: price.price_area,
-                forecast: price.forecast
-              })
+              // Determine if this price is actually a forecast based on current time
+              const priceTime = new Date(price.timestamp)
+              const currentTime = new Date()
+              const isActuallyForecast = priceTime > currentTime
+              
+              // Use UPSERT instead of CREATE to handle duplicates gracefully
+              const query = `
+                UPDATE electricity_price:⟨${price.timestamp.replace(/[:.]/g, '_')}⟩ 
+                SET 
+                  timestamp = '${price.timestamp}',
+                  price_cents_kwh = ${price.price_cents_kwh},
+                  price_area = '${price.price_area}',
+                  forecast = ${isActuallyForecast}
+              `
+              const result = await db.query(query)
+              console.log(`Stored price for ${price.timestamp}: ${price.price_cents_kwh} c/kWh (forecast: ${isActuallyForecast})`)
               totalUpdated++
             } catch (error) {
-              // Ignore duplicate key errors
-              const errorMessage = error instanceof Error ? error.message : String(error)
-              if (!errorMessage.includes('already contains')) {
-                console.error('Error storing price:', error)
-              }
+              console.error(`Error storing price for ${price.timestamp}:`, error)
             }
           }
         }

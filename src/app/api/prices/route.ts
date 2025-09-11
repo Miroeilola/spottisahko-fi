@@ -26,10 +26,12 @@ export async function GET(request: NextRequest) {
     const endTime = new Date()
     endTime.setDate(endTime.getDate() + 2) // Include up to 2 days of forecasts
     
+    console.log(`Fetching prices from ${startTime.toISOString()} to ${endTime.toISOString()}`)
+    
     const result = await db.query<[ElectricityPrice[]]>(`
       SELECT * FROM electricity_price 
-      WHERE timestamp >= '${startTime.toISOString()}' 
-      AND timestamp <= '${endTime.toISOString()}'
+      WHERE timestamp >= type::datetime('${startTime.toISOString()}') 
+      AND timestamp <= type::datetime('${endTime.toISOString()}')
       ORDER BY timestamp ASC
     `)
     
