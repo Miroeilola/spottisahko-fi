@@ -53,7 +53,7 @@ export class GeminiAI {
     const priceLevel = this.categorizePriceLevel(currentPrice.price_cents_kwh)
     
     const currentDate = new Date().toLocaleDateString('fi-FI')
-    const reasons = {
+    const reasons: Record<string, string> = {
       "Erittäin halpa": "runsaan tuulivoimatuotannon ja vähäisen kysynnän ansiosta",
       "Halpa": "hyvän energiatuotannon ja maltillisen kysynnän vuoksi", 
       "Normaali": "tasapainoisen tarjonta-kysyntäsuhteen myötä",
