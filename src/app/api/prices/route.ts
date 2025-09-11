@@ -19,11 +19,18 @@ export async function GET(request: NextRequest) {
     
     console.log('Prices API - Total electricity_price records:', countResult[0]?.[0]?.count || 0)
     
-    // Get recent prices (allowing day-ahead future prices)
+    // Get recent prices including future forecasts (up to 2 days ahead)
+    const startTime = new Date()
+    startTime.setHours(startTime.getHours() - hours)
+    
+    const endTime = new Date()
+    endTime.setDate(endTime.getDate() + 2) // Include up to 2 days of forecasts
+    
     const result = await db.query<[ElectricityPrice[]]>(`
       SELECT * FROM electricity_price 
-      ORDER BY timestamp DESC
-      LIMIT ${limit}
+      WHERE timestamp >= '${startTime.toISOString()}' 
+      AND timestamp <= '${endTime.toISOString()}'
+      ORDER BY timestamp ASC
     `)
     
     let prices = result[0] || []

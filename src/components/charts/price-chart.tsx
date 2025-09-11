@@ -1,23 +1,55 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ElectricityPrice } from '@/types/electricity'
-import { format, subDays, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns'
+import { format, subDays, subYears, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns'
 import { fi } from 'date-fns/locale'
 import { getPriceColor } from '@/lib/utils'
 
 interface PriceChartProps {
-  data: ElectricityPrice[]
+  data: ElectricityPrice[] // Initial data for short periods
   className?: string
+  includeVat?: boolean
+  currentPrice?: number // Current price for reference line
 }
 
-type TimeRange = '24h' | '7d' | '30d'
+type TimeRange = '24h' | '7d' | '30d' | '1y' | '5y'
 
-export function PriceChart({ data, className }: PriceChartProps) {
+export function PriceChart({ data, className, includeVat = false, currentPrice }: PriceChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
+  const [chartData, setChartData] = useState<ElectricityPrice[]>(data)
+  const [loading, setLoading] = useState(false)
+
+  // Fetch appropriate data based on time range
+  useEffect(() => {
+    const fetchDataForRange = async () => {
+      if (timeRange === '1y' || timeRange === '5y') {
+        setLoading(true)
+        try {
+          const days = timeRange === '1y' ? 365 : 1825
+          const vatParam = includeVat ? '?vat=true' : ''
+          const response = await fetch(`/api/prices/daily?days=${days}${includeVat ? '&vat=true' : ''}`)
+          const result = await response.json()
+          
+          if (result.success) {
+            setChartData(result.data)
+          }
+        } catch (error) {
+          console.error('Failed to fetch long-term data:', error)
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        // Use provided data for short periods
+        setChartData(data)
+      }
+    }
+
+    fetchDataForRange()
+  }, [timeRange, includeVat, data])
 
   const getFilteredData = () => {
     const now = new Date()
@@ -33,20 +65,40 @@ export function PriceChart({ data, className }: PriceChartProps) {
       case '30d':
         startDate = subDays(now, 30)
         break
+      case '1y':
+        startDate = subYears(now, 1)
+        break
+      case '5y':
+        startDate = subYears(now, 5)
+        break
       default:
         startDate = subDays(now, 1)
     }
 
-    return data
-      .filter(price => {
-        const priceDate = new Date(price.timestamp)
-        return isAfter(priceDate, startDate) && isBefore(priceDate, now)
-      })
+    // Filter data based on the time range, including future forecast data
+    // For short periods (24h, 7d, 30d), include forecast data up to 2 days ahead
+    const maxFutureDate = new Date(now)
+    maxFutureDate.setDate(maxFutureDate.getDate() + (timeRange === '24h' || timeRange === '7d' || timeRange === '30d' ? 2 : 0))
+    
+    const filteredByRange = chartData.filter(price => {
+      const priceDate = new Date(price.timestamp)
+      return isAfter(priceDate, startDate) && isBefore(priceDate, maxFutureDate)
+    })
+
+    // For long periods, if no data in range, show all available data including forecasts
+    const finalData = (timeRange === '1y' || timeRange === '5y') && filteredByRange.length === 0 
+      ? chartData.filter(price => isBefore(new Date(price.timestamp), maxFutureDate))
+      : filteredByRange
+
+    return finalData
       .map(price => ({
         ...price,
         timestamp: new Date(price.timestamp).getTime(),
         displayTime: format(new Date(price.timestamp), 
-          timeRange === '24h' ? 'HH:mm' : 'dd.MM HH:mm', 
+          timeRange === '24h' ? 'HH:mm' : 
+          timeRange === '7d' ? 'dd.MM HH:mm' :
+          timeRange === '30d' ? 'dd.MM HH:mm' :
+          'dd.MM.yyyy', 
           { locale: fi }
         ),
         color: price.price_cents_kwh < 5 ? '#22c55e' : 
@@ -55,11 +107,11 @@ export function PriceChart({ data, className }: PriceChartProps) {
       .sort((a, b) => a.timestamp - b.timestamp)
   }
 
-  const chartData = getFilteredData()
+  const filteredData = getFilteredData()
   
   // Calculate average for reference line
-  const averagePrice = chartData.length > 0 
-    ? chartData.reduce((sum, item) => sum + item.price_cents_kwh, 0) / chartData.length
+  const averagePrice = filteredData.length > 0 
+    ? filteredData.reduce((sum, item) => sum + item.price_cents_kwh, 0) / filteredData.length
     : 0
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -69,8 +121,14 @@ export function PriceChart({ data, className }: PriceChartProps) {
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-medium">{data.displayTime}</p>
           <p className={`text-lg font-bold ${getPriceColor(data.price_cents_kwh)}`}>
-            {data.price_cents_kwh.toFixed(2)} c/kWh
+            {data.is_daily_avg ? 'Keskiarvo: ' : ''}{data.price_cents_kwh.toFixed(2)} c/kWh
           </p>
+          {data.is_daily_avg && data.min_price && data.max_price && (
+            <div className="text-sm text-gray-600 mt-1">
+              <p>Min: {data.min_price.toFixed(2)} c/kWh</p>
+              <p>Max: {data.max_price.toFixed(2)} c/kWh</p>
+            </div>
+          )}
           {data.forecast && (
             <p className="text-sm text-gray-500">Ennuste</p>
           )}
@@ -84,7 +142,9 @@ export function PriceChart({ data, className }: PriceChartProps) {
     const date = new Date(tickItem)
     return timeRange === '24h' 
       ? format(date, 'HH:mm', { locale: fi })
-      : format(date, 'dd.MM', { locale: fi })
+      : timeRange === '7d' || timeRange === '30d'
+      ? format(date, 'dd.MM', { locale: fi })
+      : format(date, 'MM/yy', { locale: fi })
   }
 
   return (
@@ -98,7 +158,7 @@ export function PriceChart({ data, className }: PriceChartProps) {
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            {(['24h', '7d', '30d'] as TimeRange[]).map((range) => (
+            {(['24h', '7d', '30d', '1y', '5y'] as TimeRange[]).map((range) => (
               <Button
                 key={range}
                 variant={timeRange === range ? 'default' : 'outline'}
@@ -112,13 +172,17 @@ export function PriceChart({ data, className }: PriceChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {chartData.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            Ladataan hintatietoja...
+          </div>
+        ) : filteredData.length === 0 ? (
           <div className="flex items-center justify-center h-64 text-muted-foreground">
             Ei hintatietoja valitulta aikaväliltä
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={filteredData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
               <XAxis 
                 dataKey="timestamp"
@@ -145,6 +209,18 @@ export function PriceChart({ data, className }: PriceChartProps) {
               {/* Price thresholds */}
               <ReferenceLine y={5} stroke="#22c55e" strokeDasharray="3 3" opacity={0.5} />
               <ReferenceLine y={10} stroke="#eab308" strokeDasharray="3 3" opacity={0.5} />
+              
+              {/* Current time and price indicator (vertical line) */}
+              <ReferenceLine 
+                x={new Date().getTime()} 
+                stroke="#ef4444" 
+                strokeWidth={2}
+                label={{ 
+                  value: currentPrice ? `Nyt: ${currentPrice.toFixed(2)} c/kWh` : 'Nyt', 
+                  position: 'topLeft', 
+                  offset: 10 
+                }}
+              />
               
               <Line
                 type="monotone"

@@ -20,16 +20,33 @@ export async function POST(request: NextRequest) {
     const db = await database.getDb()
     let totalUpdated = 0
     
-    // Try to fetch prices for today and the last 3 days
-    for (let daysBack = 0; daysBack <= 3; daysBack++) {
+    // Fetch prices for past 3 days, today, and next 2 days (forecasts)
+    // ENTSO-E typically publishes day-ahead prices around 13:00 CET for the next day
+    const datesToFetch = []
+    
+    // Past 3 days
+    for (let daysBack = 3; daysBack >= 1; daysBack--) {
       const targetDate = new Date()
       targetDate.setDate(targetDate.getDate() - daysBack)
-      
+      datesToFetch.push(targetDate)
+    }
+    
+    // Today
+    datesToFetch.push(new Date())
+    
+    // Next 2 days (forecasts)
+    for (let daysForward = 1; daysForward <= 2; daysForward++) {
+      const targetDate = new Date()
+      targetDate.setDate(targetDate.getDate() + daysForward)
+      datesToFetch.push(targetDate)
+    }
+    
+    for (const targetDate of datesToFetch) {
       console.log(`Fetching prices for ${targetDate.toISOString().split('T')[0]}`)
       
       try {
         const prices = await entsoEClient.fetchDayAheadPrices(targetDate)
-        console.log(`Fetched ${prices.length} prices for ${targetDate.toISOString().split('T')[0]}`)
+        console.log(`Fetched ${prices.length} prices for ${targetDate.toISOString().split('T')[0]} (${prices.filter(p => p.forecast).length} forecasts)`)
         
         if (prices.length > 0) {
           // Store prices in database

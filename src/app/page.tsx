@@ -176,7 +176,14 @@ export default function Home() {
 
             {/* Price Chart */}
             <section onClick={handleChartInteraction}>
-              <PriceChart data={data.priceHistory} />
+              <PriceChart 
+                data={data.priceHistory} 
+                includeVat={includeVat}
+                currentPrice={data.currentPrice?.price_cents_kwh ? 
+                  (includeVat ? data.currentPrice.price_cents_kwh * 1.255 : data.currentPrice.price_cents_kwh) 
+                  : undefined
+                }
+              />
             </section>
 
             {/* Recent Blog Posts */}
