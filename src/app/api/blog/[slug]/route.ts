@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { database } from '@/lib/db'
 import { BlogPost } from '@/types/electricity'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }

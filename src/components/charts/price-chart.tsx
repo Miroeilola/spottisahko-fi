@@ -246,7 +246,7 @@ export function PriceChart({ data, className, includeVat = false, currentPrice }
                   strokeWidth={2}
                   label={{ 
                     value: currentPrice ? `Nyt: ${currentPrice.toFixed(2)} c/kWh` : 'Nyt', 
-                    position: 'topLeft', 
+                    position: 'top', 
                     offset: 10 
                   }}
                 />
@@ -296,7 +296,7 @@ export function PriceChart({ data, className, includeVat = false, currentPrice }
                   strokeWidth={2}
                   label={{ 
                     value: currentPrice ? `Nyt: ${currentPrice.toFixed(2)} c/kWh` : 'Nyt', 
-                    position: 'topLeft', 
+                    position: 'top', 
                     offset: 10 
                   }}
                 />
