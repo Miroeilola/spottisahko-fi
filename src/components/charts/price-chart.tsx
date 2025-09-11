@@ -22,7 +22,7 @@ type ChartType = 'line' | 'bar'
 
 export function PriceChart({ data, className, includeVat = false, currentPrice }: PriceChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
-  const [chartType, setChartType] = useState<ChartType>('line')
+  const [chartType, setChartType] = useState<ChartType>('bar')
   const [chartData, setChartData] = useState<ElectricityPrice[]>(data)
   const [loading, setLoading] = useState(false)
 
