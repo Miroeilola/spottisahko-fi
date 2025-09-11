@@ -11,8 +11,9 @@ export async function GET(request: Request) {
     const includeVat = url.searchParams.get('vat') === 'true'
     const vatRate = 1.255 // Finnish VAT 25.5%
     
-    // Get recent prices
-    const response = await fetch('http://localhost:3001/api/prices?hours=24')
+    // Get recent prices from internal API
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const response = await fetch(`${baseUrl}/api/prices?hours=24`)
     const data = await response.json()
     
     if (data.success && data.data && data.data.length > 0) {
