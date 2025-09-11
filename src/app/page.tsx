@@ -43,8 +43,8 @@ export default function Home() {
         const currentResponse = await fetch(`/api/prices/current${vatParam}`)
         const currentData = await currentResponse.json()
         
-        // Fetch price history (last 24 hours)
-        const historyResponse = await fetch(`/api/prices?hours=24${vatParamWithAnd}`)
+        // Fetch price history (last 30 days for chart)
+        const historyResponse = await fetch(`/api/prices?hours=720${vatParamWithAnd}`)
         const historyData = await historyResponse.json()
         
         // Fetch today's stats

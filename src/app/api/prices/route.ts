@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     
     const searchParams = request.nextUrl.searchParams
     const hours = parseInt(searchParams.get('hours') || '24')
-    const limit = Math.min(hours, 168) // Max 7 days
+    const limit = Math.min(hours, 720) // Max 30 days
     const includeVat = searchParams.get('vat') === 'true'
     const vatRate = 1.255 // Finnish VAT 25.5%
     
