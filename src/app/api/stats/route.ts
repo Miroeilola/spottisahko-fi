@@ -12,9 +12,6 @@ export async function GET(request: NextRequest) {
     const includeVat = searchParams.get('vat') === 'true'
     const vatRate = 1.255 // Finnish VAT 25.5%
     
-    // Get database connection
-    const db = await database.getDb()
-    
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
