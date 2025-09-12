@@ -18,24 +18,50 @@ export async function GET(request: NextRequest) {
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
-    // First, let's try to get all prices for today and filter afterwards
+    // Query prices directly for the specific date range
+    // Use date range to handle timezone differences
+    const startOfDay = new Date(`${date}T00:00:00.000Z`)
+    const endOfDay = new Date(`${date}T23:59:59.999Z`)
+    
     const result = await db.query<[any[]]>(`
       SELECT price_cents_kwh, timestamp, forecast FROM electricity_price 
-      ORDER BY timestamp DESC
-      LIMIT 50
+      WHERE timestamp >= type::datetime('${startOfDay.toISOString()}')
+      AND timestamp <= type::datetime('${endOfDay.toISOString()}')
+      ORDER BY timestamp ASC
     `)
     
-    let allPrices = Array.isArray(result[0]) ? result[0] : []
-    console.log('Stats API found', allPrices.length, 'total prices in DB')
+    let prices = Array.isArray(result[0]) ? result[0] : []
+    console.log('Stats API found', prices.length, 'prices for', date)
     
-    // Filter to today's prices
-    const targetDateStr = date
-    let prices = allPrices.filter((price: any) => {
-      const priceDate = new Date(price.timestamp).toISOString().split('T')[0]
-      return priceDate === targetDateStr
-    })
-    
-    console.log('Stats API found', prices.length, 'prices for', targetDateStr)
+    // If no prices found with UTC dates, try with a wider range to account for timezone offset
+    if (prices.length === 0) {
+      // Expand search to include +/- 12 hours for timezone differences
+      const expandedStart = new Date(startOfDay)
+      expandedStart.setHours(expandedStart.getHours() - 12)
+      const expandedEnd = new Date(endOfDay)
+      expandedEnd.setHours(expandedEnd.getHours() + 12)
+      
+      const expandedResult = await db.query<[any[]]>(`
+        SELECT price_cents_kwh, timestamp, forecast FROM electricity_price 
+        WHERE timestamp >= type::datetime('${expandedStart.toISOString()}')
+        AND timestamp <= type::datetime('${expandedEnd.toISOString()}')
+        ORDER BY timestamp ASC
+      `)
+      
+      let allPrices = Array.isArray(expandedResult[0]) ? expandedResult[0] : []
+      
+      // Filter to match the target date in Finnish timezone (UTC+2/+3)
+      prices = allPrices.filter((price: any) => {
+        const priceDate = new Date(price.timestamp)
+        // Convert to Finnish timezone for comparison
+        const finnishOffset = 2 * 60 * 60 * 1000 // Default to UTC+2, could be +3 during DST
+        const finnishDate = new Date(priceDate.getTime() + finnishOffset)
+        const priceDateStr = finnishDate.toISOString().split('T')[0]
+        return priceDateStr === date
+      })
+      
+      console.log('Stats API found', prices.length, 'prices after timezone adjustment')
+    }
     
     // If this is today and we have both forecast and actual prices for the same hour,
     // prefer actual prices over forecasts
