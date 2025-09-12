@@ -12,10 +12,23 @@ export async function GET(request: Request) {
     const vatRate = 1.255 // Finnish VAT 25.5%
     
     // Get recent prices from internal API
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    // In production, use relative URL to avoid domain issues
+    const isProduction = process.env.NODE_ENV === 'production'
+    const baseUrl = isProduction 
+      ? `${request.url.split('/api/')[0]}` 
+      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')
     const vatParam = includeVat ? '&vat=true' : ''
-    const response = await fetch(`${baseUrl}/api/prices?hours=24${vatParam}`)
+    const apiUrl = `${baseUrl}/api/prices?hours=24${vatParam}`
+    
+    console.log('Current price API: Fetching from:', apiUrl)
+    const response = await fetch(apiUrl)
     const data = await response.json()
+    
+    console.log('Current price API: Got response:', {
+      success: data.success,
+      dataLength: data.data?.length || 0,
+      sample: data.data?.[0]
+    })
     
     if (data.success && data.data && data.data.length > 0) {
       const prices = data.data

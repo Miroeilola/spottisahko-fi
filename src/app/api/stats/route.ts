@@ -18,79 +18,50 @@ export async function GET(request: NextRequest) {
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
-    // Create a new db connection for this request to avoid any state issues
-    const freshDb = await database.getDb()
+    // Get database connection - use the same pattern as prices API
+    const db = await database.getDb()
     
-    // Use a simpler, more direct approach that works in production
-    let allDbPrices: any[] = []
+    // Fetch data using the same approach as the working prices API
+    // Get a wider range and filter in memory
+    const hoursBack = 48 // Get last 48 hours of data
+    const startTime = new Date()
+    startTime.setHours(startTime.getHours() - hoursBack)
     
-    try {
-      // Try to get prices with a date range query that's more explicit
-      const startDate = new Date(date)
-      startDate.setUTCHours(0, 0, 0, 0)
-      const endDate = new Date(date)
-      endDate.setUTCHours(23, 59, 59, 999)
-      
-      // Use the same query pattern that works in the prices API
-      const query = `
-        SELECT * FROM electricity_price 
-        WHERE timestamp >= type::datetime('${startDate.toISOString()}')
-        AND timestamp <= type::datetime('${endDate.toISOString()}')
-        ORDER BY timestamp ASC
-      `
-      
-      console.log('Stats API: Executing date range query for:', date)
-      const dateResult = await freshDb.query(query)
-      
-      if (Array.isArray(dateResult) && dateResult.length > 0 && Array.isArray(dateResult[0])) {
-        allDbPrices = dateResult[0]
-        console.log('Stats API: Found', allDbPrices.length, 'prices directly for date', date)
-      }
-    } catch (error) {
-      console.error('Stats API: Date range query failed:', error)
-    }
+    const endTime = new Date()
+    endTime.setDate(endTime.getDate() + 2) // Include future data
     
-    // If date range query didn't work, fall back to getting all prices
-    if (allDbPrices.length === 0) {
-      console.log('Stats API: Date range query returned no results, trying fallback...')
-      
-      try {
-        // Use the exact same approach as the prices API which is working
-        const fallbackQuery = `
-          SELECT * FROM electricity_price 
-          ORDER BY timestamp DESC
-          LIMIT 200
-        `
-        
-        const fallbackResult = await freshDb.query(fallbackQuery)
-        
-        if (Array.isArray(fallbackResult) && fallbackResult.length > 0) {
-          const firstResult = fallbackResult[0]
-          
-          // Check if we got actual data
-          if (Array.isArray(firstResult)) {
-            const allPrices = firstResult
-            console.log('Stats API: Fallback query found', allPrices.length, 'total prices')
-            
-            // Filter for the requested date
-            allDbPrices = allPrices.filter((price: any) => {
-              if (!price.timestamp) return false
-              const priceDate = new Date(price.timestamp).toISOString().split('T')[0]
-              return priceDate === date
-            })
-            
-            console.log('Stats API: Filtered to', allDbPrices.length, 'prices for date', date)
-          } else {
-            console.log('Stats API: Fallback query returned non-array:', typeof firstResult)
-          }
-        }
-      } catch (error) {
-        console.error('Stats API: Fallback query failed:', error)
+    console.log('Stats API: Fetching prices from', startTime.toISOString(), 'to', endTime.toISOString())
+    
+    // Use the EXACT same query structure as the working prices API
+    const result = await db.query(`
+      SELECT * FROM electricity_price 
+      WHERE timestamp >= type::datetime('${startTime.toISOString()}') 
+      AND timestamp <= type::datetime('${endTime.toISOString()}')
+      ORDER BY timestamp ASC
+    `)
+    
+    let allPrices: any[] = []
+    
+    // Handle the result the same way as prices API
+    if (Array.isArray(result) && result.length > 0) {
+      if (Array.isArray(result[0])) {
+        allPrices = result[0]
+        console.log('Stats API: Query returned', allPrices.length, 'prices')
+      } else {
+        console.log('Stats API: Query returned non-array first element:', typeof result[0])
+        // Log first 200 chars of result for debugging
+        console.log('Stats API: Result preview:', JSON.stringify(result).slice(0, 200))
       }
     }
     
-    // Use the filtered prices
-    let prices = allDbPrices
+    // Filter for the requested date
+    let prices = allPrices.filter((price: any) => {
+      if (!price || !price.timestamp) return false
+      const priceDate = new Date(price.timestamp).toISOString().split('T')[0]
+      return priceDate === date
+    })
+    
+    console.log('Stats API: Filtered to', prices.length, 'prices for date', date)
     
     console.log('Stats API: Processing', prices.length, 'prices for stats calculation')
     
