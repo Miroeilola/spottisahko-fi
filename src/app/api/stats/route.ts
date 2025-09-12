@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       LIMIT 50
     `)
     
-    let allPrices = result[0] || []
+    let allPrices = Array.isArray(result[0]) ? result[0] : []
     console.log('Stats API found', allPrices.length, 'total prices in DB')
     
     // Filter to today's prices

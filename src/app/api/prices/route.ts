@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       ORDER BY timestamp ASC
     `)
     
-    let prices = result[0] || []
+    let prices = Array.isArray(result[0]) ? result[0] : []
     
     // Apply VAT if requested
     if (includeVat) {
