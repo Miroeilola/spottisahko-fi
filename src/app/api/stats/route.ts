@@ -18,77 +18,81 @@ export async function GET(request: NextRequest) {
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
-    // Get database connection and ensure it's connected
-    await database.ensureConnection()
+    // Create a new db connection for this request to avoid any state issues
+    const freshDb = await database.getDb()
     
-    // First get ALL prices to debug what we have
-    // Create a fresh query to avoid any cached metadata
-    const query = 'SELECT * FROM electricity_price ORDER BY timestamp DESC LIMIT 100'
-    console.log('Stats API: Executing query:', query)
-    
-    const allResult = await db.query(query)
-    
-    // SurrealDB returns an array of results, one for each query
-    // The actual data is in the first element if query succeeded
+    // Use a simpler, more direct approach that works in production
     let allDbPrices: any[] = []
     
-    // Check if we got metadata instead of data
-    if (Array.isArray(allResult) && allResult.length > 0) {
-      const firstResult = allResult[0]
+    try {
+      // Try to get prices with a date range query that's more explicit
+      const startDate = new Date(date)
+      startDate.setUTCHours(0, 0, 0, 0)
+      const endDate = new Date(date)
+      endDate.setUTCHours(23, 59, 59, 999)
       
-      // If the result contains 'tables' or 'accesses', it's metadata, not data
-      if (firstResult && typeof firstResult === 'object' && ('tables' in firstResult || 'accesses' in firstResult)) {
-        console.log('Stats API: Got metadata instead of data, retrying query...')
-        // Retry with a more explicit query
-        const retryResult = await db.query('SELECT timestamp, price_cents_kwh, forecast, price_area FROM electricity_price ORDER BY timestamp DESC LIMIT 100')
-        if (Array.isArray(retryResult) && Array.isArray(retryResult[0])) {
-          allDbPrices = retryResult[0]
+      // Use the same query pattern that works in the prices API
+      const query = `
+        SELECT * FROM electricity_price 
+        WHERE timestamp >= type::datetime('${startDate.toISOString()}')
+        AND timestamp <= type::datetime('${endDate.toISOString()}')
+        ORDER BY timestamp ASC
+      `
+      
+      console.log('Stats API: Executing date range query for:', date)
+      const dateResult = await freshDb.query(query)
+      
+      if (Array.isArray(dateResult) && dateResult.length > 0 && Array.isArray(dateResult[0])) {
+        allDbPrices = dateResult[0]
+        console.log('Stats API: Found', allDbPrices.length, 'prices directly for date', date)
+      }
+    } catch (error) {
+      console.error('Stats API: Date range query failed:', error)
+    }
+    
+    // If date range query didn't work, fall back to getting all prices
+    if (allDbPrices.length === 0) {
+      console.log('Stats API: Date range query returned no results, trying fallback...')
+      
+      try {
+        // Use the exact same approach as the prices API which is working
+        const fallbackQuery = `
+          SELECT * FROM electricity_price 
+          ORDER BY timestamp DESC
+          LIMIT 200
+        `
+        
+        const fallbackResult = await freshDb.query(fallbackQuery)
+        
+        if (Array.isArray(fallbackResult) && fallbackResult.length > 0) {
+          const firstResult = fallbackResult[0]
+          
+          // Check if we got actual data
+          if (Array.isArray(firstResult)) {
+            const allPrices = firstResult
+            console.log('Stats API: Fallback query found', allPrices.length, 'total prices')
+            
+            // Filter for the requested date
+            allDbPrices = allPrices.filter((price: any) => {
+              if (!price.timestamp) return false
+              const priceDate = new Date(price.timestamp).toISOString().split('T')[0]
+              return priceDate === date
+            })
+            
+            console.log('Stats API: Filtered to', allDbPrices.length, 'prices for date', date)
+          } else {
+            console.log('Stats API: Fallback query returned non-array:', typeof firstResult)
+          }
         }
-      } else if (Array.isArray(firstResult)) {
-        allDbPrices = firstResult
+      } catch (error) {
+        console.error('Stats API: Fallback query failed:', error)
       }
     }
     
-    console.log('Stats API: Query result length:', allResult.length, 'First element is array:', Array.isArray(allResult[0]))
-    console.log('Stats API: Total prices in DB:', allDbPrices.length)
-    if (allDbPrices.length > 0) {
-      console.log('Stats API: Sample timestamps:', allDbPrices.slice(0, 3).map((p: any) => p.timestamp))
-      console.log('Stats API: First price object:', JSON.stringify(allDbPrices[0]))
-    } else if (allResult.length > 0 && !Array.isArray(allResult[0])) {
-      console.log('Stats API: Raw result (not array):', JSON.stringify(allResult).slice(0, 500))
-    }
+    // Use the filtered prices
+    let prices = allDbPrices
     
-    // Now filter for the requested date
-    // Since electricity prices are in hourly intervals and might be stored in different timezones,
-    // we need to be more flexible with date matching
-    let prices = allDbPrices.filter((price: any) => {
-      if (!price.timestamp) return false
-      
-      // Try multiple date parsing approaches
-      const priceDate = new Date(price.timestamp)
-      
-      // Check if the date matches in UTC
-      const utcDateStr = priceDate.toISOString().split('T')[0]
-      if (utcDateStr === date) return true
-      
-      // Check if the date matches in Finnish timezone (UTC+2 or UTC+3)
-      // Finland is UTC+2 (winter) or UTC+3 (summer DST)
-      const finnishTime = new Date(priceDate.toLocaleString("en-US", {timeZone: "Europe/Helsinki"}))
-      const finnishDateStr = finnishTime.toISOString().split('T')[0]
-      if (finnishDateStr === date) return true
-      
-      // Also check with manual offset (in case toLocaleString doesn't work in production)
-      const offsetHours = [2, 3] // UTC+2 or UTC+3
-      for (const offset of offsetHours) {
-        const offsetTime = new Date(priceDate.getTime() + offset * 60 * 60 * 1000)
-        const offsetDateStr = offsetTime.toISOString().split('T')[0]
-        if (offsetDateStr === date) return true
-      }
-      
-      return false
-    })
-    
-    console.log('Stats API found', prices.length, 'prices for date', date)
+    console.log('Stats API: Processing', prices.length, 'prices for stats calculation')
     
     // If this is today and we have both forecast and actual prices for the same hour,
     // prefer actual prices over forecasts
