@@ -20,15 +20,19 @@ export async function GET(request: NextRequest) {
     
     // First get ALL prices to debug what we have
     const allResult = await db.query<[any[]]>(`
-      SELECT price_cents_kwh, timestamp, forecast FROM electricity_price 
+      SELECT * FROM electricity_price 
       ORDER BY timestamp DESC
       LIMIT 100
     `)
     
     const allDbPrices = Array.isArray(allResult[0]) ? allResult[0] : []
+    console.log('Stats API: Query result length:', allResult.length, 'First element is array:', Array.isArray(allResult[0]))
     console.log('Stats API: Total prices in DB:', allDbPrices.length)
     if (allDbPrices.length > 0) {
       console.log('Stats API: Sample timestamps:', allDbPrices.slice(0, 3).map((p: any) => p.timestamp))
+      console.log('Stats API: First price object:', JSON.stringify(allDbPrices[0]))
+    } else if (allResult.length > 0) {
+      console.log('Stats API: Raw result (not array):', JSON.stringify(allResult).slice(0, 200))
     }
     
     // Now filter for the requested date

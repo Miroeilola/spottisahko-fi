@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
       SELECT count() as count FROM electricity_price
     `)
     
-    console.log('Prices API - Total electricity_price records:', countResult[0]?.[0]?.count || 0)
+    const count = Array.isArray(countResult[0]) && countResult[0].length > 0 
+      ? countResult[0][0]?.count 
+      : (countResult as any)?.count || 0
+    
+    console.log('Prices API - Total electricity_price records:', count)
     
     // Get recent prices including future forecasts (up to 2 days ahead)
     const startTime = new Date()
@@ -44,7 +48,27 @@ export async function GET(request: NextRequest) {
       ORDER BY timestamp ASC
     `)
     
+    console.log('Prices API - Query result structure:', {
+      resultLength: result.length,
+      firstElementType: typeof result[0],
+      firstElementIsArray: Array.isArray(result[0]),
+      firstElementLength: Array.isArray(result[0]) ? result[0].length : 'N/A'
+    })
+    
     let prices = Array.isArray(result[0]) ? result[0] : []
+    
+    // If still no prices, try to get ANY prices for debugging
+    if (prices.length === 0) {
+      const anyResult = await db.query<[ElectricityPrice[]]>(`
+        SELECT * FROM electricity_price 
+        ORDER BY timestamp DESC
+        LIMIT 10
+      `)
+      console.log('Prices API - Fetched ANY prices:', Array.isArray(anyResult[0]) ? anyResult[0].length : 0)
+      if (Array.isArray(anyResult[0]) && anyResult[0].length > 0) {
+        console.log('Prices API - Sample price:', JSON.stringify(anyResult[0][0]))
+      }
+    }
     
     // Apply VAT if requested
     if (includeVat) {
