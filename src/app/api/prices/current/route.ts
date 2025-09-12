@@ -11,48 +11,95 @@ export async function GET(request: Request) {
     const includeVat = url.searchParams.get('vat') === 'true'
     const vatRate = 1.255 // Finnish VAT 25.5%
     
-    // Get recent prices from internal API
-    // In production, use relative URL to avoid domain issues
-    const isProduction = process.env.NODE_ENV === 'production'
-    const baseUrl = isProduction 
-      ? `${request.url.split('/api/')[0]}` 
-      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')
-    const vatParam = includeVat ? '&vat=true' : ''
-    const apiUrl = `${baseUrl}/api/prices?hours=24${vatParam}`
+    // Get database connection directly (same pattern as working stats API)
+    const db = await database.getDb()
     
-    console.log('Current price API: Fetching from:', apiUrl)
-    const response = await fetch(apiUrl)
-    const data = await response.json()
+    // Update forecast flags for past prices
+    const currentTime = new Date()
+    await db.query(`
+      UPDATE electricity_price 
+      SET forecast = false 
+      WHERE forecast = true 
+      AND timestamp <= type::datetime('${currentTime.toISOString()}')
+    `)
     
-    console.log('Current price API: Got response:', {
-      success: data.success,
-      dataLength: data.data?.length || 0,
-      sample: data.data?.[0]
-    })
+    // Fetch recent prices directly from database
+    const hoursBack = 48
+    const startTime = new Date()
+    startTime.setHours(startTime.getHours() - hoursBack)
     
-    if (data.success && data.data && data.data.length > 0) {
-      const prices = data.data
+    const endTime = new Date()
+    endTime.setDate(endTime.getDate() + 2) // Include future data
+    
+    console.log('Current price API: Fetching from DB, range:', startTime.toISOString(), 'to', endTime.toISOString())
+    
+    const result = await db.query(`
+      SELECT * FROM electricity_price 
+      WHERE timestamp >= type::datetime('${startTime.toISOString()}') 
+      AND timestamp <= type::datetime('${endTime.toISOString()}')
+      ORDER BY timestamp DESC
+    `)
+    
+    let prices: any[] = []
+    if (Array.isArray(result) && result.length > 0 && Array.isArray(result[0])) {
+      prices = result[0]
+    }
+    
+    console.log('Current price API: Found', prices.length, 'prices in DB')
+    
+    if (prices.length > 0) {
       const now = new Date()
-      
-      // Filter to only past and current hour prices (not future forecasts for "current")
-      const currentTime = now.toISOString()
       const currentHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0, 0)
       
-      // First try to get actual (non-forecast) prices
-      const actualPrices = prices.filter((p: any) => p.timestamp <= currentTime && !p.forecast)
+      // Find the price for current hour
+      let currentPrice = prices.find((p: any) => {
+        const priceTime = new Date(p.timestamp)
+        return priceTime.getFullYear() === currentHour.getFullYear() &&
+               priceTime.getMonth() === currentHour.getMonth() &&
+               priceTime.getDate() === currentHour.getDate() &&
+               priceTime.getHours() === currentHour.getHours()
+      })
       
-      // If no actual price for current hour, include forecast for current hour
-      let currentPrice = actualPrices[0]
-      if (!currentPrice || new Date(actualPrices[0].timestamp) < currentHour) {
-        // Try to find a price for the current hour (including forecasts)
-        const currentHourPrice = prices.find((p: any) => {
-          const priceHour = new Date(p.timestamp)
-          return priceHour.getTime() === currentHour.getTime()
-        })
-        currentPrice = currentHourPrice || actualPrices[0] || prices[0]
+      // If no exact match for current hour, get the most recent price
+      if (!currentPrice) {
+        const pastPrices = prices.filter((p: any) => new Date(p.timestamp) <= now)
+        currentPrice = pastPrices[0] || prices[0]
       }
       
-      const previousPrice = actualPrices[1] || prices[1]
+      // Get previous hour's price
+      const previousHour = new Date(currentHour.getTime() - 60 * 60 * 1000)
+      let previousPrice = prices.find((p: any) => {
+        const priceTime = new Date(p.timestamp)
+        return priceTime.getFullYear() === previousHour.getFullYear() &&
+               priceTime.getMonth() === previousHour.getMonth() &&
+               priceTime.getDate() === previousHour.getDate() &&
+               priceTime.getHours() === previousHour.getHours()
+      })
+      
+      // Fallback for previous price
+      if (!previousPrice && prices.length > 1) {
+        const currentIndex = prices.findIndex((p: any) => p === currentPrice)
+        previousPrice = prices[currentIndex + 1] || prices[1]
+      }
+      
+      console.log('Current price API: Current price:', currentPrice?.timestamp, currentPrice?.price_cents_kwh)
+      console.log('Current price API: Previous price:', previousPrice?.timestamp, previousPrice?.price_cents_kwh)
+      
+      // Apply VAT if requested
+      if (includeVat && currentPrice) {
+        currentPrice = {
+          ...currentPrice,
+          price_cents_kwh: Math.round(currentPrice.price_cents_kwh * vatRate * 100) / 100,
+          vat_included: true
+        }
+      }
+      if (includeVat && previousPrice) {
+        previousPrice = {
+          ...previousPrice,
+          price_cents_kwh: Math.round(previousPrice.price_cents_kwh * vatRate * 100) / 100,
+          vat_included: true
+        }
+      }
       
       return NextResponse.json({
         success: true,
@@ -60,8 +107,8 @@ export async function GET(request: Request) {
           current: currentPrice,
           previous: previousPrice
         },
-        vat_included: data.vat_included || includeVat,
-        vat_rate: data.vat_rate || (includeVat ? "25.5%" : null)
+        vat_included: includeVat,
+        vat_rate: includeVat ? "25.5%" : null
       })
     }
     
