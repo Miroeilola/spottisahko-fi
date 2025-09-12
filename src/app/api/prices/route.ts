@@ -12,6 +12,15 @@ export async function GET(request: NextRequest) {
     const includeVat = searchParams.get('vat') === 'true'
     const vatRate = 1.255 // Finnish VAT 25.5%
     
+    // Update forecast flags for all prices based on current time
+    const currentTime = new Date()
+    await db.query(`
+      UPDATE electricity_price 
+      SET forecast = false 
+      WHERE forecast = true 
+      AND timestamp <= type::datetime('${currentTime.toISOString()}')
+    `)
+    
     // Check record count for debugging
     const countResult = await db.query<[{count: number}[]]>(`
       SELECT count() as count FROM electricity_price
