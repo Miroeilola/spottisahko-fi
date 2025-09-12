@@ -19,20 +19,29 @@ export async function GET(request: NextRequest) {
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
     // First get ALL prices to debug what we have
-    const allResult = await db.query<[any[]]>(`
+    const allResult = await db.query(`
       SELECT * FROM electricity_price 
       ORDER BY timestamp DESC
       LIMIT 100
     `)
     
-    const allDbPrices = Array.isArray(allResult[0]) ? allResult[0] : []
+    // SurrealDB returns an array of results, one for each query
+    // The actual data is in the first element if query succeeded
+    let allDbPrices: any[] = []
+    
+    if (Array.isArray(allResult) && allResult.length > 0) {
+      if (Array.isArray(allResult[0])) {
+        allDbPrices = allResult[0]
+      }
+    }
+    
     console.log('Stats API: Query result length:', allResult.length, 'First element is array:', Array.isArray(allResult[0]))
     console.log('Stats API: Total prices in DB:', allDbPrices.length)
     if (allDbPrices.length > 0) {
       console.log('Stats API: Sample timestamps:', allDbPrices.slice(0, 3).map((p: any) => p.timestamp))
       console.log('Stats API: First price object:', JSON.stringify(allDbPrices[0]))
     } else if (allResult.length > 0) {
-      console.log('Stats API: Raw result (not array):', JSON.stringify(allResult).slice(0, 200))
+      console.log('Stats API: Raw result (not array):', JSON.stringify(allResult).slice(0, 500))
     }
     
     // Now filter for the requested date

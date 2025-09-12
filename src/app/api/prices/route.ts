@@ -21,14 +21,20 @@ export async function GET(request: NextRequest) {
       AND timestamp <= type::datetime('${currentTime.toISOString()}')
     `)
     
-    // Check record count for debugging
-    const countResult = await db.query<[{count: number}[]]>(`
-      SELECT count() as count FROM electricity_price
+    // Check record count for debugging - use proper SurrealDB syntax
+    const countResult = await db.query(`
+      SELECT count() FROM electricity_price GROUP ALL
     `)
     
-    const count = Array.isArray(countResult[0]) && countResult[0].length > 0 
-      ? countResult[0][0]?.count 
-      : (countResult as any)?.count || 0
+    let count = 0
+    if (Array.isArray(countResult) && countResult.length > 0) {
+      const firstResult = countResult[0]
+      if (Array.isArray(firstResult) && firstResult.length > 0) {
+        count = firstResult[0]?.count || 0
+      } else if (typeof firstResult === 'object' && firstResult !== null) {
+        count = (firstResult as any).count || 0
+      }
+    }
     
     console.log('Prices API - Total electricity_price records:', count)
     
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`Fetching prices from ${startTime.toISOString()} to ${endTime.toISOString()}`)
     
-    const result = await db.query<[ElectricityPrice[]]>(`
+    const result = await db.query(`
       SELECT * FROM electricity_price 
       WHERE timestamp >= type::datetime('${startTime.toISOString()}') 
       AND timestamp <= type::datetime('${endTime.toISOString()}')
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
     
     // If still no prices, try to get ANY prices for debugging
     if (prices.length === 0) {
-      const anyResult = await db.query<[ElectricityPrice[]]>(`
+      const anyResult = await db.query(`
         SELECT * FROM electricity_price 
         ORDER BY timestamp DESC
         LIMIT 10
