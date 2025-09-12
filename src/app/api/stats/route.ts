@@ -18,20 +18,34 @@ export async function GET(request: NextRequest) {
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
+    // Get database connection and ensure it's connected
+    await database.ensureConnection()
+    
     // First get ALL prices to debug what we have
-    const allResult = await db.query(`
-      SELECT * FROM electricity_price 
-      ORDER BY timestamp DESC
-      LIMIT 100
-    `)
+    // Create a fresh query to avoid any cached metadata
+    const query = 'SELECT * FROM electricity_price ORDER BY timestamp DESC LIMIT 100'
+    console.log('Stats API: Executing query:', query)
+    
+    const allResult = await db.query(query)
     
     // SurrealDB returns an array of results, one for each query
     // The actual data is in the first element if query succeeded
     let allDbPrices: any[] = []
     
+    // Check if we got metadata instead of data
     if (Array.isArray(allResult) && allResult.length > 0) {
-      if (Array.isArray(allResult[0])) {
-        allDbPrices = allResult[0]
+      const firstResult = allResult[0]
+      
+      // If the result contains 'tables' or 'accesses', it's metadata, not data
+      if (firstResult && typeof firstResult === 'object' && ('tables' in firstResult || 'accesses' in firstResult)) {
+        console.log('Stats API: Got metadata instead of data, retrying query...')
+        // Retry with a more explicit query
+        const retryResult = await db.query('SELECT timestamp, price_cents_kwh, forecast, price_area FROM electricity_price ORDER BY timestamp DESC LIMIT 100')
+        if (Array.isArray(retryResult) && Array.isArray(retryResult[0])) {
+          allDbPrices = retryResult[0]
+        }
+      } else if (Array.isArray(firstResult)) {
+        allDbPrices = firstResult
       }
     }
     
@@ -40,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (allDbPrices.length > 0) {
       console.log('Stats API: Sample timestamps:', allDbPrices.slice(0, 3).map((p: any) => p.timestamp))
       console.log('Stats API: First price object:', JSON.stringify(allDbPrices[0]))
-    } else if (allResult.length > 0) {
+    } else if (allResult.length > 0 && !Array.isArray(allResult[0])) {
       console.log('Stats API: Raw result (not array):', JSON.stringify(allResult).slice(0, 500))
     }
     
