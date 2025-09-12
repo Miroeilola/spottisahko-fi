@@ -18,50 +18,50 @@ export async function GET(request: NextRequest) {
     // Query prices for the specific date - simplified approach
     console.log('Stats API querying for date:', date, 'isToday:', date === today)
     
-    // Query prices directly for the specific date range
-    // Use date range to handle timezone differences
-    const startOfDay = new Date(`${date}T00:00:00.000Z`)
-    const endOfDay = new Date(`${date}T23:59:59.999Z`)
-    
-    const result = await db.query<[any[]]>(`
+    // First get ALL prices to debug what we have
+    const allResult = await db.query<[any[]]>(`
       SELECT price_cents_kwh, timestamp, forecast FROM electricity_price 
-      WHERE timestamp >= type::datetime('${startOfDay.toISOString()}')
-      AND timestamp <= type::datetime('${endOfDay.toISOString()}')
-      ORDER BY timestamp ASC
+      ORDER BY timestamp DESC
+      LIMIT 100
     `)
     
-    let prices = Array.isArray(result[0]) ? result[0] : []
-    console.log('Stats API found', prices.length, 'prices for', date)
-    
-    // If no prices found with UTC dates, try with a wider range to account for timezone offset
-    if (prices.length === 0) {
-      // Expand search to include +/- 12 hours for timezone differences
-      const expandedStart = new Date(startOfDay)
-      expandedStart.setHours(expandedStart.getHours() - 12)
-      const expandedEnd = new Date(endOfDay)
-      expandedEnd.setHours(expandedEnd.getHours() + 12)
-      
-      const expandedResult = await db.query<[any[]]>(`
-        SELECT price_cents_kwh, timestamp, forecast FROM electricity_price 
-        WHERE timestamp >= type::datetime('${expandedStart.toISOString()}')
-        AND timestamp <= type::datetime('${expandedEnd.toISOString()}')
-        ORDER BY timestamp ASC
-      `)
-      
-      let allPrices = Array.isArray(expandedResult[0]) ? expandedResult[0] : []
-      
-      // Filter to match the target date in Finnish timezone (UTC+2/+3)
-      prices = allPrices.filter((price: any) => {
-        const priceDate = new Date(price.timestamp)
-        // Convert to Finnish timezone for comparison
-        const finnishOffset = 2 * 60 * 60 * 1000 // Default to UTC+2, could be +3 during DST
-        const finnishDate = new Date(priceDate.getTime() + finnishOffset)
-        const priceDateStr = finnishDate.toISOString().split('T')[0]
-        return priceDateStr === date
-      })
-      
-      console.log('Stats API found', prices.length, 'prices after timezone adjustment')
+    const allDbPrices = Array.isArray(allResult[0]) ? allResult[0] : []
+    console.log('Stats API: Total prices in DB:', allDbPrices.length)
+    if (allDbPrices.length > 0) {
+      console.log('Stats API: Sample timestamps:', allDbPrices.slice(0, 3).map((p: any) => p.timestamp))
     }
+    
+    // Now filter for the requested date
+    // Since electricity prices are in hourly intervals and might be stored in different timezones,
+    // we need to be more flexible with date matching
+    let prices = allDbPrices.filter((price: any) => {
+      if (!price.timestamp) return false
+      
+      // Try multiple date parsing approaches
+      const priceDate = new Date(price.timestamp)
+      
+      // Check if the date matches in UTC
+      const utcDateStr = priceDate.toISOString().split('T')[0]
+      if (utcDateStr === date) return true
+      
+      // Check if the date matches in Finnish timezone (UTC+2 or UTC+3)
+      // Finland is UTC+2 (winter) or UTC+3 (summer DST)
+      const finnishTime = new Date(priceDate.toLocaleString("en-US", {timeZone: "Europe/Helsinki"}))
+      const finnishDateStr = finnishTime.toISOString().split('T')[0]
+      if (finnishDateStr === date) return true
+      
+      // Also check with manual offset (in case toLocaleString doesn't work in production)
+      const offsetHours = [2, 3] // UTC+2 or UTC+3
+      for (const offset of offsetHours) {
+        const offsetTime = new Date(priceDate.getTime() + offset * 60 * 60 * 1000)
+        const offsetDateStr = offsetTime.toISOString().split('T')[0]
+        if (offsetDateStr === date) return true
+      }
+      
+      return false
+    })
+    
+    console.log('Stats API found', prices.length, 'prices for date', date)
     
     // If this is today and we have both forecast and actual prices for the same hour,
     // prefer actual prices over forecasts
